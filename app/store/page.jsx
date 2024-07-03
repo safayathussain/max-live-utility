@@ -5,10 +5,10 @@ import { getTimeFromDuration } from '@/utility/functions'
 import { jwtDecode } from 'jwt-decode'
 import Image from 'next/image'
 import { useSearchParams } from 'next/navigation'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { Suspense, useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 
-const page = () => {
+const Page = () => {
     const [selectedCategory, setSelectedCategory] = useState("RIDE")
     const [skins, setskins] = useState([])
     const [selectedSkin, setselectedSkin] = useState({})
@@ -187,4 +187,13 @@ const page = () => {
     )
 }
 
-export default page
+// export default Page
+
+
+const SuspendedStorePage = () => (
+    <Suspense fallback={<div>Loading...</div>}>
+        <Page />
+    </Suspense>
+);
+
+export default SuspendedStorePage;
