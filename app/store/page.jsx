@@ -2,7 +2,11 @@
 import useClickOutside from '@/hooks/useClickOutside'
 import { FetchApi } from '@/utility/FetchApi'
 import { getTimeFromDuration } from '@/utility/functions'
+import { jwtDecode } from 'jwt-decode'
+import Image from 'next/image'
+import { useSearchParams } from 'next/navigation'
 import React, { useEffect, useRef, useState } from 'react'
+import toast from 'react-hot-toast'
 
 const page = () => {
     const [selectedCategory, setSelectedCategory] = useState("RIDE")
@@ -11,9 +15,20 @@ const page = () => {
     const [selectedPrice, setselectedPrice] = useState({})
     const [buySkinPopup, setbuySkinPopup] = useState(false)
     const [skinPreview, setskinPreview] = useState(false)
-
+    const query = useSearchParams()
+    const { user: jwtUser, exp } = jwtDecode(query.get('token'))
+    const [user, setuser] = useState(jwtUser)
+    const refetchAuth =async () => {
+        const res = await FetchApi({
+            url: `/user/getUserById/${jwtUser?._id}`, callback: () => {
+            }
+        })
+        console.log(user, res.data)
+        setuser(res.data.user)
+    }
     useEffect(() => {
         const loadData = async () => {
+            refetchAuth()
             const { data } = await FetchApi({ url: 'skin' })
             setskins(data.result)
         }
@@ -24,15 +39,45 @@ const page = () => {
     const previewRef = useRef()
     useClickOutside(ref, () => {
         setbuySkinPopup(false)
+        if (selectedSkin.fileType.includes('video')) {
+
+            previewRef.current.pause()
+        }
     })
     useClickOutside(previewRef, () => {
         setskinPreview(false)
     })
+    const handleBuySkin = async () => {
+        const currentTime = Date.now() / 1000;
+        if (exp < currentTime) {
+            return toast.error("Token is expired")
+        }
+        if (!selectedPrice.time) {
+            return toast.error("Please select a time")
+        }
+        if (!user) {
+            return toast.error("User not found")
+        }
+        const data = {
+            user: user.maxId,
+            skinId: selectedSkin._id,
+            expiresIn: selectedPrice.time
+        }
+        try {
+            await FetchApi({ url: 'skin/buy-skin', method: 'post', data, isToast: true, callback: refetchAuth})
+
+        } catch (error) {
+
+        }
+    }
     return (
         <div className='overflow-hidden relative max-w-[500px] mx-auto'>
             <div >
                 <div className='bg-white relative max-w-[500px] px-5 pt-7 w-full h-screen mx-auto'>
-                    <p className='text-black text-xl'>Store</p>
+                    <div className='flex justify-between'>
+                        <p className='text-black text-xl'>Store</p>
+                        <p className='text-end'>Beans: {user?.beans}</p>
+                    </div>
                     <div className=''>
                         <div className='flex gap-2 mx-auto justify-center mt-5 border-[2px] rounded-lg border-primary p-1 w-max text-sm'>
                             <p className={`px-5 py-2 rounded-lg cursor-pointer  ${selectedCategory === 'RIDE' ? 'bg-primary text-white' : 'text-primary'}`} onClick={() => setSelectedCategory('RIDE')}>Ride</p>
@@ -43,7 +88,12 @@ const page = () => {
                     <div className='mt-3 grid grid-cols-2 gap-1' >
                         {
                             filteredSkins?.map((skin, i) => <div key={i} className='rounded-lg border border-primary' onClick={() => setselectedSkin(skin)}>
-                                <div className='w-32 h-32 mx-auto my-2 relative' onClick={() => setskinPreview(true)}>
+                                <div className='w-32 h-32 mx-auto my-2 relative' onClick={() => {
+                                    setskinPreview(true)
+                                    if (previewRef.current && typeof previewRef.current.play === 'function') {
+                                        previewRef?.current?.play()
+                                    }
+                                }}>
                                     {
                                         skin?.fileType?.includes('video') ? <video src={skin.file} muted className=' object-cover w-32 h-32'></video> :
                                             <img src={skin.file} alt='' className='object-cover w-32 h-32' />
@@ -101,7 +151,7 @@ const page = () => {
                     <div className={`${buySkinPopup ? 'block p-5' : 'hidden'}`}>
                         <div className='w-32 h-32 mx-auto  -mt-20 rounded-full outline outline-primary'>
                             {
-                                selectedSkin?.fileType?.includes('video') ? <video src={selectedSkin?.file} autoPlay={true} muted loop className=' rounded-full object-cover w-32 h-32'></video> :
+                                selectedSkin?.fileType?.includes('video') ? <video src={selectedSkin?.file} autoPlay={true} muted={true} loop className=' rounded-full object-cover w-32 h-32'></video> :
                                     <img src={selectedSkin?.file} alt='' className='rounded-full object-cover w-32 h-32' />
                             }
                         </div>
@@ -116,15 +166,15 @@ const page = () => {
                             }
                         </div>
                         <p className='text-sm my-2'>Price: <span className='font-semibold'>{selectedPrice?.value}</span> beans</p>
-                        <button className='w-full bg-primary rounded-lg text-white py-2'>Buy Now</button>
+                        <button className='w-full bg-primary rounded-lg text-white py-2' onClick={handleBuySkin}>Buy Now</button>
                     </div>
 
                 </div>
-                <div className={`absolute duration-300 ${!skinPreview ? '-top-[1000px]' : 'top-0'}`}>
-                    <div className='h-screen flex items-center bg-black bg-opacity-30'>
+                <div className={`absolute duration-300 w-full ${!skinPreview ? '-top-[1000px]' : 'top-0'}`}>
+                    <div className='h-screen flex items-center bg-black bg-opacity-30 w-full'>
                         {
                             selectedSkin?.fileType?.includes('video') ? <video ref={previewRef} src={selectedSkin?.file} autoPlay={true} loop className=' '></video> :
-                                <img ref={previewRef} src={selectedSkin?.file} alt='' className='' />
+                                <Image ref={previewRef} src={selectedSkin?.file} alt='' width={500} height={500} className='w-full' />
                         }
                     </div>
                 </div>
