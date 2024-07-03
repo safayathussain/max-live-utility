@@ -17,6 +17,9 @@ const page = () => {
     const [skinPreview, setskinPreview] = useState(false)
     const query = useSearchParams()
     const { user: jwtUser, exp } = jwtDecode(query.get('token'))
+    if(!jwtUser){
+        return <></>
+    }
     const [user, setuser] = useState(jwtUser)
     const refetchAuth =async () => {
         const res = await FetchApi({
